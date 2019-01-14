@@ -15,61 +15,79 @@ The Kubernetes [networking model](https://kubernetes.io/docs/concepts/cluster-ad
 
 ### Virtual Private Cloud Network
 
-In this section a dedicated [Virtual Private Cloud](https://cloud.google.com/compute/docs/networks-and-firewalls#networks) (VPC) network will be setup to host the Kubernetes cluster.
+In this section a dedicated [Virtual Private Cloud](https://docs.aws.amazon.com/vpc/latest/userguide/what-is-amazon-vpc.html) (VPC) network will be setup to host the Kubernetes cluster.
 
-Create the `kubernetes-the-hard-way` custom VPC network:
-
-```
-gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
-```
-
-A [subnet](https://cloud.google.com/compute/docs/vpc/#vpc_networks_and_subnets) must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
-
-Create the `kubernetes` subnet in the `kubernetes-the-hard-way` VPC network:
+Create the `kubernetes-the-aws-way` custom VPC network:
 
 ```
-gcloud compute networks subnets create kubernetes \
-  --network kubernetes-the-hard-way \
-  --range 10.240.0.0/24
+aws ec2 create-vpc  --cidr-block 10.240.0.0/16  
+```
+
+A [subnet](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Subnets.html) must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster.
+
+Create the `kubernetes` subnet in the `kubernetes-the-aws-way` VPC network:
+
+```
+aws ec2 create-subnet --vpc-id vpc-2f09a348 --cidr-block 10.0.1.0/24
+
 ```
 
 > The `10.240.0.0/24` IP address range can host up to 254 compute instances.
 
-### Firewall Rules
-
-Create a firewall rule that allows internal communication across all protocols:
+### Create an Internet Gateway
 
 ```
-gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
-  --allow tcp,udp,icmp \
-  --network kubernetes-the-hard-way \
-  --source-ranges 10.240.0.0/24,10.200.0.0/16
+aws ec2 create-internet-gateway
 ```
-
-Create a firewall rule that allows external SSH, ICMP, and HTTPS:
-
+### Attached the Internet Gateway to the VPC
 ```
-gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
-  --allow tcp:22,tcp:6443,icmp \
-  --network kubernetes-the-hard-way \
-  --source-ranges 0.0.0.0/0
+aws ec2 attach-internet-gateway --vpc-id $vpc_id --internet-gateway-id $internet_gateway
 ```
-
-> An [external load balancer](https://cloud.google.com/compute/docs/load-balancing/network/) will be used to expose the Kubernetes API Servers to remote clients.
-
-List the firewall rules in the `kubernetes-the-hard-way` VPC network:
+### Create Route Table
 
 ```
-gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
+aws ec2 create-route-table --vpc-id $vpc_id
 ```
 
-> output
+### Create a route in the route table that points all traffic (0.0.0.0/0) to the internet gateway
+```
+aws ec2 create-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 --gateway-id $internet_gateway
+```
 
-```
-NAME                                    NETWORK                  DIRECTION  PRIORITY  ALLOW                 DENY
-kubernetes-the-hard-way-allow-external  kubernetes-the-hard-way  INGRESS    1000      tcp:22,tcp:6443,icmp
-kubernetes-the-hard-way-allow-internal  kubernetes-the-hard-way  INGRESS    1000      tcp,udp,icmp
-```
+Confirm the route table has a route to internet:
+```aws ec2 describe-route-tables --route-table-id $route_table_id```
+Associate the route table to the subnet 
+```aws ec2 associate-route-table --subnet-id $subnet_id --route-table-id $route_table_id```
+
+### Create firewall Rules (Security Groups)
+Create a security group in your VPC, and add a rule that allows SSH access from anywhere.
+```aws ec2 create-security-group --group-name SSHAccess --description "Security group for SSH access" --vpc-id $vpc_id```
+Security group for internal access
+
+```aws ec2 authorize-security-group-ingress --group-id $sg_group_id --ip-permissions IpProtocol=icmp,FromPort=0,ToPort=4,IpRanges='[{CidrIp=10.240.0.0/24}, {CidrIp=10.200.0.0/16}]’ ```
+
+```aws ec2 authorize-security-group-ingress --group-id $sg_group_id --ip-permissions IpProtocol=tcp,FromPort=0,ToPort=65000,IpRanges='[{CidrIp=10.240.0.0/24}, {CidrIp=10.200.0.0/16}]’```
+
+``` aws ec2 authorize-security-group-ingress --group-id $sg_group_id --ip-permissions IpProtocol=udp,FromPort=0,ToPort=65000,IpRanges='[{CidrIp=10.240.0.0/24}, {CidrIp=10.200.0.0/16}]' ```
+
+``` aws ec2 authorize-security-group-ingress --group-id $sg_group_id --protocol tcp  --cidr 10.240.0.0/24 ```
+Security group for external access 
+ ```aws ec2 authorize-security-group-ingress --group-id $sg_group_id --ip-permissions IpProtocol=icmp,FromPort=0,ToPort=4,IpRanges='[{CidrIp=0.0.0.0/0}]'```
+
+``` aws ec2 authorize-security-group-ingress --group-id $sg_group_id --protocol tcp --port 22 --cidr 0.0.0.0/0 ```
+
+``` aws ec2 authorize-security-group-ingress --group-id $sg_group_id --protocol tcp --port 6443 --cidr 0.0.0.0/0 ```
+
+Create a static Public IP address that will be attached to the external load balancer fronting the Kubernetes API Servers:
+
+``` aws ec2 allocate-address ```
+Record the allocation id into `$allocation_id` and tag it as shown below
+
+``` aws ec2 create-tags --resource $allocation_id --tags Key=Name,Value=kubernetes-the-hard-way ```
+
+### worker node elastic IP addresses
+
+### worker node Elastic Network Interfaces 
 
 ### Kubernetes Public IP Address
 
@@ -80,7 +98,7 @@ gcloud compute addresses create kubernetes-the-hard-way \
   --region $(gcloud config get-value compute/region)
 ```
 
-Verify the `kubernetes-the-hard-way` static IP address was created in your default compute region:
+Verify the `kubernetes-the-aws-way` static IP address was created in your default compute region:
 
 ```
 gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
@@ -90,7 +108,7 @@ gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
 
 ```
 NAME                     REGION    ADDRESS        STATUS
-kubernetes-the-hard-way  us-west1  XX.XXX.XXX.XX  RESERVED
+kubernetes-the-aws-way  us-west1  XX.XXX.XXX.XX  RESERVED
 ```
 
 ## Compute Instances
