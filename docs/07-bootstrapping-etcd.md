@@ -25,7 +25,7 @@ I="${N: -1}"
 sudo hostnamectl set-hostname controller-${I}
 ```
 Make sure the following entry in the “/etc/cloud/cloud.cfg” file has changed from false to true 
-> this is an eara to contribute. write a SED command to change this entry 
+> this is an area to contribute. write a SED command to change this entry 
 
 ```
 preserve_hostname: true
