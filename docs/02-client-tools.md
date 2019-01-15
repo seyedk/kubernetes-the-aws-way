@@ -5,11 +5,13 @@ In this lab you will install the command line utilities required to complete thi
 ## Install jq
 jq makes the life of parsing json in command line so easy that sometimes I forget that AWS CLI has --filter and --query options. You may have noticed that there are examples in Amazon AWS documentations that they have also used jq. Easy to install and easy to learn
 
-to install jq on MacOS:
+###  install jq on MacOS:
 
 ```
 brew install jq
 ``` 
+
+for other OS, please visit [this website](https://stedolan.github.io/jq/download/)
 ## Install CFSSL
 
 The `cfssl` and `cfssljson` command line utilities will be used to provision a [PKI Infrastructure](https://en.wikipedia.org/wiki/Public_key_infrastructure) and generate TLS certificates.
