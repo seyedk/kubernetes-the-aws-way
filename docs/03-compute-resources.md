@@ -128,7 +128,7 @@ Now let's create the ENIs that will be attached to the worker instances during t
     done
 
   
-  source kaw.sh
+  source ./kaw.sh
 }
 
 ```
@@ -194,13 +194,13 @@ aws ec2 run-instances \
  --image-id ami-0bbe6b35405ecebdb \
  --count 1 \
  --instance-type t2.micro \
- --key-name ocsd-chef \
- --security-group-ids sg-0eda6c7af70be33f8 \
- --subnet-id subnet-0d92dc021a1b13936 \
+ --key-name $keypairname \
+ --security-group-ids $secGroupId \
+ --subnet-id $subnetId \
  --private-ip-address 10.240.0.1${i} \
 --associate-public-ip-address \
 --disable-api-termination \
- --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=controller-$i},{Key=hol,Value=khw}]"
+ --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=controller-$i},{Key=hol,Value=kaw}]"
 done
 ```
 
@@ -225,7 +225,7 @@ aws ec2 run-instances \
 --count 1 \
 
 --instance-type t2.micro \
---key-name ocsd-chef \
+--key-name $keypairname \
 --disable-api-termination \
 --user-data pod-cidr=10.200.${i}.0/24 \
 --network-interfaces "{\"DeviceIndex\":0,\"NetworkInterfaceId\": \"${n}\"}" \
@@ -256,7 +256,13 @@ worker-2      us-west1-c  n1-standard-1               10.240.0.22  XXX.XXX.XX.XX
 
 ## Configuring SSH Access
 
-SSH will be used to configure the controller and worker instances. When connecting to compute instances for the first time SSH keys will be generated for you and stored in the project or instance metadata as describe in the [connecting to instances](https://cloud.google.com/compute/docs/instances/connecting-to-instance) documentation.
+SSH will be used to configure the controller and worker instances. In order to proceed to the next configuration steps, we add the IP addresses of the instances into the /etc/hosts file. this step is left open for contribution. 
+
+```
+  pleae provide the code that gets the public address of each instance, and based on its tag, adds an entry to /hosts file
+```
+
+
 
 Test SSH access to the `controller-0` compute instances:
 
