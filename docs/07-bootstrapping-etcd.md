@@ -4,10 +4,10 @@ Kubernetes components are stateless and store cluster state in [etcd](https://gi
 
 ## Prerequisites
 
-The commands in this lab must be run on each controller instance: `controller-0`, `controller-1`, and `controller-2`. Login to each controller instance using the `gcloud` command. Example:
+The commands in this lab must be run on each controller instance: `controller-0`, `controller-1`, and `controller-2`. Login to each controller instance using the `ssh` command. Example:
 
 ```
-gcloud compute ssh controller-0
+ ssh ubuntu@controller-0
 ```
 
 ### Running commands in parallel with tmux
@@ -15,6 +15,26 @@ gcloud compute ssh controller-0
 [tmux](https://github.com/tmux/tmux/wiki) can be used to run commands on multiple compute instances at the same time. See the [Running commands in parallel with tmux](01-prerequisites.md#running-commands-in-parallel-with-tmux) section in the Prerequisites lab.
 
 ## Bootstrapping an etcd Cluster Member
+
+### change the Hostname of the controller nodes
+
+You should ensure the hostname of the ubuntu has changed to the right hostname 
+```
+N=$(hostname -s)
+I="${N: -1}"
+sudo hostnamectl set-hostname controller-${I}
+```
+Make sure the following entry in the “/etc/cloud/cloud.cfg” file has changed from false to true 
+> this is an eara to contribute. write a SED command to change this entry 
+
+```
+preserve_hostname: true
+``` 
+The run the following command to reboot the instance and the log back in with ssh 
+```
+$ sudo reboot
+```
+(Link to https://linuxize.com/post/how-to-change-hostname-on-ubuntu-18-04/)
 
 ### Download and Install the etcd Binaries
 
@@ -46,8 +66,7 @@ Extract and install the `etcd` server and the `etcdctl` command line utility:
 The instance internal IP address will be used to serve client requests and communicate with etcd cluster peers. Retrieve the internal IP address for the current compute instance:
 
 ```
-INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" \
-  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
+INTERNAL_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4/)
 ```
 
 Each etcd member must have a unique name within an etcd cluster. Set the etcd name to match the hostname of the current compute instance:
